@@ -92,45 +92,38 @@ void MainWindow::Execute()
             printf("Sending ERROR signal\n");
             write(pipefd[1],"ERROR",5); //Send error to main application
         }
+	else {
+	    write(pipefd[1],"DONE!",5);
+	}
         exit(0);
     }
     else
     {
-        //close(pipefd[1]); //Close write-end of the pipe.
-        char buf;
+	printf("Waiting for any error message...\n");
+	char buf;
         int n = 0;
-        pid_t d_id = fork();
-        if(d_id == 0)
-        {
-            printf("Sending EOF to main application in 10 seconds...\n");
-            sleep(10);
-            write(pipefd[1],"!",1); //Send EOF to main application, if it hasn't exited already.
-            exit(0);
-        }
-        while(read(pipefd[0],&buf,1) > 0) //read while EOF
-        {
-            bigbuf[n++]=buf;
-            if(n==9)
-            {
-                break;
-            }
-            //write(1,&buf,1);
-        }
-        bigbuf[n]=0;
-        write(1,"\n",1);
-        //close(pipefd[0]); //Close read-end of the pipe.
-        if(strcmp(bigbuf,"ERROR")==0)
-        {
+	fd_set set;
+	struct timeval timeout;
+
+	FD_ZERO(&set);
+	FD_SET(pipefd[0], &set);
+
+	timeout.tv_sec = 2;
+	timeout.tv_usec = 0;
+
+	int ret = select(FD_SETSIZE, &set, NULL, NULL, &timeout);
+	if(ret == 0) {
+		printf("No launch errors detected... closing app\n");
+	}
+	else {
             QMessageBox msgbox;
             msgbox.setText("The specified command failed.");
             msgbox.setStandardButtons(QMessageBox::Ok);
             msgbox.exec();
             printf("ERROR message received; terminating.\n");
-        }
-        else
-        {
-            printf("EOF received; terminating.\n");
-        }
+	}
+	printf("Closing\n");
+
         QApplication::exit();
     }
 }
